@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stableford Scorer with Course Selection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    input[type=number] {
+      width: 60px;
+      padding: 4px;
+      font-size: 1rem;
+    }
+    input.strokes {
+      width: 50px;
+      text-align: center;
+    }
+    .birdie {
+      background-color: #c6f6d5; /* light green */
+    }
+    .par {
+      background-color: #bee3f8; /* light blue */
+    }
+    .bogey {
+      background-color: #fbd38d; /* light orange */
+    }
+    .double {
+      background-color: #feb2b2; /* light red */
+    }
+    .eagle {
+      background-color: #d6bcfa; /* light purple */
+    }
+    #results h2 {
+      margin-top: 1rem;
+    }
+    #courseSelect {
+      font-size: 1.1rem;
+      padding: 5px;
+      margin-right: 10px;
+    }
+    #enterScoresBtn {
+      padding: 6px 12px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    tfoot td {
+      font-weight: bold;
+      background-color: #f4f4f4;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Stableford Scorer with Course Selection</h1>
+
+  <label for="courseSelect">Select Golf Course:</label>
+  <select id="courseSelect">
+    <option value="">-- Select Course --</option>
+    <option value="bangaloreGolfClub">Bangalore Golf Club</option>
+    <option value="ascGolfClub">ASC Golf Club</option>
+    <option value="sportsAuthority">Sports Authority of India Golf Club</option>
+    <option value="prestigeGolfshire">Prestige Golfshire</option>
+  </select>
+
+  <button id="enterScoresBtn">Enter Scores</button>
+
+  <br/><br/>
+
+  <label for="handicap">Handicap: </label>
+  <input type="number" id="handicap" min="0" max="54" value="18" />
+  <small>(Enter your handicap)</small>
+
+  <table id="scoreTable">
+    <thead>
+      <tr>
+        <th>Hole</th>
+        <th>Par</th>
+        <th>Stroke Index (SI)</th>
+        <th>Strokes Taken</th>
+        <th>Stableford Points</th>
+      </tr>
+    </thead>
+    <tbody id="holesBody"></tbody>
+    <tfoot>
+      <tr id="outRow">
+        <td>Out (1-9)</td>
+        <td colspan="3"></td>
+        <td id="outPoints">-</td>
+      </tr>
+      <tr id="inRow">
+        <td>In (10-18)</td>
+        <td colspan="3"></td>
+        <td id="inPoints">-</td>
+      </tr>
+      <tr id="totalRow">
+        <td>Total</td>
+        <td colspan="3"></td>
+        <td id="totalPoints">-</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div id="results"></div>
+
+<script>
+  // Course data for Par and Stroke Index (SI)
+  const courses = {
+    bangaloreGolfClub: {
+      name: "Bangalore Golf Club",
+      par:  [4,4,4,5,3,4,3,5,3,3,4,4,3,4,4,4,5,4],
+      strokeIdx: [3,7,9,1,15,11,17,5,13,18,2,8,16,6,12,14,4,10]
+    },
+    ascGolfClub: {
+      name: "ASC Golf Club",
+      par:  [4,4,4,4,3,5,4,3,4,5,4,4,3,4,4,4,3,5],
+      strokeIdx: [7,5,1,11,13,3,9,15,17,2,4,10,14,12,6,8,18,16]
+    },
+    sportsAuthority: {
+      name: "Sports Authority of India Golf Club",
+      par:  [3,3,3,5,4,4,4,4,4], // only 9 holes course; will pad later
+      strokeIdx: [9,8,4,1,6,2,3,5,7]
+    },
+    prestigeGolfshire: {
+      name: "Prestige Golfshire",
+      // Using a standard par 72 with generic SI since exact SI not found
+      par:  [4,5,3,4,4,4,3,5,4,4,4,3,4,4,4,3,4,5],
+      strokeIdx: [10,4,16,6,14,8,18,2,12,9,7,17,11,5,15,13,3,1]
+    }
+  };
+
+  // If a course has fewer than 18 holes (like Sports Authority 9 holes),
+  // pad par and strokeIdx arrays to length 18 with zeros
+  for (const key in courses) {
+    const c = courses[key];
+    if (c.par.length < 18) {
+      const diff = 18 - c.par.length;
+      c.par = c.par.concat(Array(diff).fill(0));
+      c.strokeIdx = c.strokeIdx.concat(Array(diff).fill(0));
+    }
+  }
+
+  // Create rows dynamically
+  const holesBody = document.getElementById('holesBody');
+  for(let i=1; i<=18; i++) {
+    const row = document.createElement('tr');
+    row.id = `row${i}`;
+    row.innerHTML = `
+      <td>${i}</td>
+      <td><input type="number" min="0" id="par${i}" readonly /></td>
+      <td><input type="number" min="0" id="si${i}" readonly /></td>
+      <td><input type="number" min="1" id="strokes${i}" class="strokes" /></td>
+      <td id="points${i}">-</td>
+    `;
+    holesBody.appendChild(row);
+  }
+
+  // Elements
+  const handicapInput = document.getElementById('handicap');
+  const enterScoresBtn = document.getElementById('enterScoresBtn');
+  const outPointsTd = document.getElementById('outPoints');
+  const inPointsTd = document.getElementById('inPoints');
+  const totalPointsTd = document.getElementById('totalPoints');
+
+  // Current selected course key
+  let currentCourseKey = null;
+
+  // Calculate stableford points for a hole
+  function calculatePoints(par, si, strokes, handicap) {
+    if (par === 0 || si === 0 || !strokes) return null; // hole not played or no data
+    // Calculate strokes received on this hole based on handicap
+    let strokesReceived = Math.floor(handicap / 18);
+    if (handicap % 18 >= si) {
+      strokesReceived += 1;
+    }
+    const netScore = strokes - strokesReceived;
+
+    // Stableford points calculation (using net score vs par)
+    const diff = par - netScore;
+    if (diff <= -2) return 0;  // double bogey or worse
+    if (diff === -1) return 1; // bogey
+    if (diff === 0) return 2;  // par
+    if (diff === 1) return 3;  // birdie
+    if (diff >= 2) return 4;   // eagle or better
+    return 0;
+  }
+
+  // Update points and colors for one hole
+  function updateHolePoints(holeNum) {
+    const par = parseInt(document.getElementById(`par${holeNum}`).value);
+    const si = parseInt(document.getElementById(`si${holeNum}`).value);
+    const strokesInput = document.getElementById(`strokes${holeNum}`);
+    const strokes = parseInt(strokesInput.value);
+    const handicap = parseInt(handicapInput.value) || 0;
+
+    const pointsTd = document.getElementById(`points${holeNum}`);
+    const row = document.getElementById(`row${holeNum}`);
+
+    if (!strokes || strokes < 1 || par === 0 || si === 0) {
+      pointsTd.textContent = '-';
+      row.className = '';
+      return;
+    }
+
+    const points = calculatePoints(par, si, strokes, handicap);
+    if (points === null) {
+      pointsTd.textContent = '-';
+      row.className = '';
+      return;
+    }
+    pointsTd.textContent = points;
+
+    // Color code row based on points
+    row.className = '';
+    if (points === 4) row.classList.add('eagle');
+    else if (points === 3) row.classList.add('birdie');
+    else if (points === 2) row.classList.add('par');
+    else if (points === 1) row.classList.add('bogey');
+    else if (points === 0) row.classList.add('double');
+  }
+
+  // Update all holes points and summaries
+  function updateAllPoints() {
+    for(let i=1; i<=18; i++) {
+      updateHolePoints(i);
+    }
+    updateSummary();
+  }
+
+  // Update Out, In, Total points summary
+  function updateSummary() {
+    let outTotal = 0;
+    let inTotal = 0;
+
+    for(let i=1; i<=9; i++) {
+      const pts = parseInt(document.getElementById(`points${i}`).textContent);
+      if (!isNaN(pts)) outTotal += pts;
+    }
+    for(let i=10; i<=18; i++) {
+      const pts = parseInt(document.getElementById(`points${i}`).textContent);
+      if (!isNaN(pts)) inTotal += pts;
+    }
+    const total = outTotal + inTotal;
+
+    outPointsTd.textContent = outTotal > 0 ? outTotal : '-';
+    inPointsTd.textContent = inTotal > 0 ? inTotal : '-';
+    totalPointsTd.textContent = total > 0 ? total : '-';
+
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = `<h2>Total Stableford Points: ${total > 0 ? total : 0}</h2>`;
+  }
+
+  // Populate Par and SI inputs based on selected course
+  function populateCourse(courseKey) {
+    if (!courses[courseKey]) return;
+    const course = courses[courseKey];
+    for(let i=1; i<=18; i++) {
+      document.getElementById(`par${i}`).value = course.par[i-1] || 0;
+      document.getElementById(`si${i}`).value = course.strokeIdx[i-1] || 0;
+      // Clear strokes and points
+      document.getElementById(`strokes${i}`).value = '';
+      document.getElementById(`points${i}`).textContent = '-';
+      document.getElementById(`row${i}`).className = '';
+    }
+    updateSummary();
+  }
+
+  // Event listeners for strokes inputs - recalc points on input change
+  for(let i=1; i<=18; i++) {
+    document.getElementById(`strokes${i}`).addEventListener('input', () => {
+      updateHolePoints(i);
+      updateSummary();
+    });
+  }
+
+  // Handicap input event - recalc all
+  handicapInput.addEventListener('input', updateAllPoints);
+
+  // Enter Scores button
+  enterScoresBtn.addEventListener('click', () => {
+    const selected = document.getElementById('courseSelect').value;
+    if (!selected) {
+      alert("Please select a golf course from the dropdown.");
+      return;
+    }
+    currentCourseKey = selected;
+    populateCourse(currentCourseKey);
+  });
+
+</script>
+
+</body>
+</html>
