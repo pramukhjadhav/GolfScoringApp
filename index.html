@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Golf Scoring App</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .login-container {
+      max-width: 400px;
+      margin: 2rem auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    .social-btn {
+      width: 100%;
+      margin-bottom: 1rem;
+      padding: 0.8rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+    }
+    .google { background: #db4437; }
+    .facebook { background: #4267B2; }
+    .yahoo { background: #720e9e; }
+    .hidden { display: none; }
+    input, select {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    button.save-btn {
+      background-color: #2e7d32;
+      color: white;
+      padding: 0.7rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>Login to Golf Scoring App</h2>
+
+    <!-- Mock Social Login Buttons -->
+    <button class="social-btn google" onclick="mockLogin('google')">Continue with Google</button>
+    <button class="social-btn facebook" onclick="mockLogin('facebook')">Continue with Facebook</button>
+    <button class="social-btn yahoo" onclick="mockLogin('yahoo')">Continue with Yahoo</button>
+
+    <!-- Profile Setup Form (shown after login) -->
+    <form id="profileForm" class="hidden">
+      <h3>Set Up Your Profile</h3>
+
+      <input type="text" id="firstName" placeholder="First Name" required />
+      <input type="text" id="lastName" placeholder="Last Name" required />
+      <input type="number" id="handicap" placeholder="Handicap" min="0" max="54" step="0.1" required />
+
+      <label for="homeCourse">Select Home Course:</label>
+      <select id="homeCourse">
+        <option>Loading nearby courses...</option>
+      </select>
+
+      <input type="password" id="password" placeholder="Create a password" required />
+
+      <button type="submit" class="save-btn">Save Profile</button>
+    </form>
+  </div>
+
+  <script>
+    function mockLogin(provider) {
+      alert(`Logging in with ${provider}... (mocked)`);
+
+      // Show profile setup form
+      document.getElementById('profileForm').classList.remove('hidden');
+
+      // Fetch nearby golf courses
+      getNearbyGolfCourses();
+    }
+
+    function getNearbyGolfCourses() {
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported by your browser.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const radius = 25000; // 25 km
+
+          const query = `
+            [out:json][timeout:25];
+            (
+              node["leisure"="golf_course"](around:${radius},${lat},${lon});
+              way["leisure"="golf_course"](around:${radius},${lat},${lon});
+              relation["leisure"="golf_course"](around:${radius},${lat},${lon});
+            );
+            out center;
+          `;
+
+          fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST",
+            body: query,
+            headers: { "Content-Type": "text/plain" }
+          })
+          .then(res => res.json())
+          .then(data => {
+            const courseSelect = document.getElementById("homeCourse");
+            courseSelect.innerHTML = "";
+
+            const names = new Set();
+            data.elements.forEach(el => {
+              if (el.tags && el.tags.name) names.add(el.tags.name);
+            });
+
+            if (names.size === 0) {
+              const opt = document.createElement("option");
+              opt.textContent = "No courses found nearby.";
+              courseSelect.appendChild(opt);
+            } else {
+              names.forEach(name => {
+                const opt = document.createElement("option");
+                opt.value = name;
+                opt.textContent = name;
+                courseSelect.appendChild(opt);
+              });
+            }
+          })
+          .catch(err => {
+            console.error("Overpass error:", err);
+            alert("Could not fetch courses.");
+          });
+        },
+        err => {
+          alert("Location error: " + err.message);
+        }
+      );
+    }
+
+    // Handle profile form submit
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const user = {
+        firstName: document.getElementById('firstName').value.trim(),
+        lastName: document.getElementById('lastName').value.trim(),
+        handicap: document.getElementById('handicap').value,
+        homeCourse: document.getElementById('homeCourse').value,
+        password: document.getElementById('password').value,
+      };
+
+      localStorage.setItem('userProfile', JSON.stringify(user));
+      alert("Profile saved!");
+
+      // Redirect to home or play page
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>
