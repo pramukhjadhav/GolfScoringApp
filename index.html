@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,7 +46,7 @@
   </div>
 
   <script>
-    // Populate Starting Hole options on load
+    // Populate hole dropdown
     window.onload = () => {
       const holeSelect = document.getElementById('hole');
       for (let i = 1; i <= 18; i++) {
@@ -60,7 +61,7 @@
       switch (action) {
         case 'play':
           document.getElementById('playModal').classList.remove('hidden');
-          getNearbyCourses();
+          getNearbyGolfCourses();
           break;
         case 'scores':
           window.location.href = 'scores.html';
@@ -80,39 +81,70 @@
       const hole = document.getElementById('hole').value;
       const format = document.getElementById('format').value;
 
-      // Redirect with parameters
       window.location.href = `play.html?course=${encodeURIComponent(course)}&hole=${hole}&format=${format}`;
     }
 
-    function getNearbyCourses() {
+    function getNearbyGolfCourses() {
       if (!navigator.geolocation) {
-        alert("Geolocation not supported.");
+        alert("Geolocation is not supported by your browser.");
         return;
       }
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        position => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
+          const radius = 25000; // 25 km
 
-          // Dummy courses for demo
-          const nearbyCourses = [
-            `Green Meadows (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
-            `Sunset Golf Club (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
-            `Lakeside Links (${lat.toFixed(2)}, ${lon.toFixed(2)})`
-          ];
+          const query = `
+            [out:json][timeout:25];
+            (
+              node["leisure"="golf_course"](around:${radius},${lat},${lon});
+              way["leisure"="golf_course"](around:${radius},${lat},${lon});
+              relation["leisure"="golf_course"](around:${radius},${lat},${lon});
+            );
+            out center;
+          `;
 
-          const courseSelect = document.getElementById('course');
-          courseSelect.innerHTML = '';
-          nearbyCourses.forEach(course => {
-            const opt = document.createElement('option');
-            opt.value = course;
-            opt.textContent = course;
-            courseSelect.appendChild(opt);
+          fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST",
+            body: query,
+            headers: {
+              "Content-Type": "text/plain"
+            }
+          })
+          .then(res => res.json())
+          .then(data => {
+            const courseSelect = document.getElementById("course");
+            courseSelect.innerHTML = "";
+
+            const names = new Set();
+            data.elements.forEach(el => {
+              if (el.tags && el.tags.name) {
+                names.add(el.tags.name);
+              }
+            });
+
+            if (names.size === 0) {
+              const opt = document.createElement('option');
+              opt.text = 'No courses found nearby';
+              courseSelect.appendChild(opt);
+            } else {
+              names.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                courseSelect.appendChild(opt);
+              });
+            }
+          })
+          .catch(err => {
+            console.error("Overpass API error:", err);
+            alert("Failed to load nearby courses.");
           });
         },
-        (error) => {
-          alert("Unable to get location.");
+        error => {
+          alert("Unable to retrieve location: " + error.message);
         }
       );
     }
