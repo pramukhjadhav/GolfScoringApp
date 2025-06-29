@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Golf Scoring App</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="landing-container">
+    <h1 class="app-title">Golf Scoring App</h1>
+    <p class="tagline">Score smarter. Play better.</p>
+
+    <div class="actions">
+      <button onclick="navigateTo('play')">Play</button>
+      <button onclick="navigateTo('scores')">My Scores</button>
+      <button onclick="navigateTo('invite')">Invite Friends</button>
+    </div>
+  </div>
+
+  <!-- Play Modal -->
+  <div id="playModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Start New Round</h2>
+
+      <label for="course">Course Lookup:</label>
+      <select id="course">
+        <option>Loading nearby courses...</option>
+      </select>
+
+      <label for="hole">Starting Hole:</label>
+      <select id="hole"></select>
+
+      <label for="format">Format:</label>
+      <select id="format">
+        <option value="strokeplay">Strokeplay</option>
+        <option value="matchplay">Matchplay</option>
+        <option value="stableford">Stableford</option>
+        <option value="skins">Skins</option>
+      </select>
+
+      <button onclick="startRound()">Start Round</button>
+      <button onclick="closeModal()" class="close-btn">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    // Populate Starting Hole options on load
+    window.onload = () => {
+      const holeSelect = document.getElementById('hole');
+      for (let i = 1; i <= 18; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i;
+        holeSelect.appendChild(opt);
+      }
+    };
+
+    function navigateTo(action) {
+      switch (action) {
+        case 'play':
+          document.getElementById('playModal').classList.remove('hidden');
+          getNearbyCourses();
+          break;
+        case 'scores':
+          window.location.href = 'scores.html';
+          break;
+        case 'invite':
+          alert("Share this link with your friends: https://pramukhjadhav.github.io/GolfScoringApp/");
+          break;
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('playModal').classList.add('hidden');
+    }
+
+    function startRound() {
+      const course = document.getElementById('course').value;
+      const hole = document.getElementById('hole').value;
+      const format = document.getElementById('format').value;
+
+      // Redirect with parameters
+      window.location.href = `play.html?course=${encodeURIComponent(course)}&hole=${hole}&format=${format}`;
+    }
+
+    function getNearbyCourses() {
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          // Dummy courses for demo
+          const nearbyCourses = [
+            `Green Meadows (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
+            `Sunset Golf Club (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
+            `Lakeside Links (${lat.toFixed(2)}, ${lon.toFixed(2)})`
+          ];
+
+          const courseSelect = document.getElementById('course');
+          courseSelect.innerHTML = '';
+          nearbyCourses.forEach(course => {
+            const opt = document.createElement('option');
+            opt.value = course;
+            opt.textContent = course;
+            courseSelect.appendChild(opt);
+          });
+        },
+        (error) => {
+          alert("Unable to get location.");
+        }
+      );
+    }
+  </script>
+</body>
+</html>
